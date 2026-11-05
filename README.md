@@ -8,7 +8,7 @@ La plataforma tiene dos módulos swerve, cada uno con un motor de dirección y u
 
 ## Contenido
 
-
+```
 matlab/      Cinemática inversa y directa, y modelo del controlador de punto objetivo
 ros2/        Paquetes de ROS 2
   swerve_robot_description/   Descripción del robot (URDF/xacro), mallas, controladores y archivos de lanzamiento
@@ -16,7 +16,7 @@ ros2/        Paquetes de ROS 2
 analisis/    Scripts de Python para analizar las corridas en Gazebo
 blender/     Script que procesa las mallas exportadas de BrickLink Studio
 prototipo/   Programas en C del prototipo a escala
-
+```
 
 ## Requisitos
 
@@ -32,11 +32,11 @@ prototipo/   Programas en C del prototipo a escala
 
 Copiar las dos carpetas de `ros2/` dentro de la carpeta `src` de un workspace de ROS 2 y compilar:
 
-
+```
 cd ~/ROS_TFG
 colcon build
 source install/setup.bash
-
+```
 
 ## Uso
 
