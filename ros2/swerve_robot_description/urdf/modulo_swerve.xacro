@@ -1,0 +1,137 @@
+<?xml version="1.0"?>
+<!--
+  Macro de un módulo swerve. Cada módulo tiene dos juntas continuas, una de
+  dirección (gira sobre Z) y una de tracción (la rueda gira sobre Y), montada
+  debajo de la de dirección.
+
+  Parámetros:
+    prefix        "der" o "izq", nombre que antecede a los links y juntas
+    reflect       1 para el módulo derecho, -1 para el izquierdo. Actualmente
+                  no se usa dentro de la macro, la posición de cada módulo
+                  viene completa en *origin.
+    parent        link del chasis al que se une el módulo
+    radio_rueda   radio de la rueda, se recibe desde swerve_robot.urdf.xacro
+    alto_modulo   distancia vertical del pivote al eje de la rueda
+    malla_pivote  archivo .dae del pivote (en meshes/), si usar_mallas es true
+    malla_rueda   archivo .dae de la rueda (en meshes/), si usar_mallas es true
+    *origin       posición del eje de dirección respecto al origen del robot
+
+  Usa el argumento usar_mallas y la propiedad ruta_mallas, que se definen en
+  swerve_robot.urdf.xacro.
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="modulo_swerve" params="prefix reflect parent radio_rueda:=0.0275 alto_modulo:=0.0805 malla_pivote:='' malla_rueda:='' *origin">
+
+    <xacro:property name="ancho_rueda" value="0.028" />
+    <xacro:property name="radio_eje_direccion" value="0.015" />   <!-- aproximado -->
+
+    <!-- Masa de la rueda con su llanta según el catálogo del fabricante.
+         La masa del pivote es estimada e incluye solo la plataforma y los
+         engranajes que giran, ya que los motores van fijos al chasis. -->
+    <xacro:property name="masa_rueda" value="0.023" />
+    <xacro:property name="masa_engranajes_eje" value="0.015" />
+    <xacro:property name="masa_steer_link" value="${masa_engranajes_eje}" />
+
+    <!-- Se supone que el eje de dirección pasa por el centro de la rueda
+         (sin desfase lateral), como en el diseño coaxial del módulo. -->
+
+    <!-- Pivote de dirección. Sin mallas se dibuja como un cilindro que
+         baja desde el punto de unión con el chasis hasta la rueda. -->
+    <link name="${prefix}_steer_link">
+      <xacro:if value="$(arg usar_mallas)">
+        <visual>
+          <geometry>
+            <mesh filename="${ruta_mallas}/${malla_pivote}" />
+          </geometry>
+          <material name="negro_azulado_pivote">
+            <color rgba="0.15 0.2 0.3 1.0" />
+          </material>
+        </visual>     
+      </xacro:if>
+      <xacro:unless value="$(arg usar_mallas)">
+        <visual>
+          <origin xyz="0 0 -${alto_modulo/2}" rpy="0 0 0" />
+          <geometry>
+            <cylinder radius="${radio_eje_direccion}" length="${alto_modulo}" />
+          </geometry>
+          <material name="negro_azulado_pivote">
+            <color rgba="0.15 0.2 0.3 1.0" />
+          </material>
+        </visual>
+      </xacro:unless>
+      <collision>
+        <origin xyz="0 0 -${alto_modulo/2}" rpy="0 0 0" />
+        <geometry>
+          <cylinder radius="${radio_eje_direccion}" length="${alto_modulo}" />
+        </geometry>
+      </collision>
+      <inertial>
+        <mass value="${masa_steer_link}" />
+        <inertia ixx="0.000005" ixy="0" ixz="0" iyy="0.000005" iyz="0" izz="0.000003" />
+      </inertial>
+    </link>
+
+    <!-- Junta de dirección. Es continua porque el módulo con engranajes
+         no tiene tope mecánico de giro. El amortiguamiento es un valor
+         aproximado. -->
+    <joint name="${prefix}_steer_joint" type="continuous">
+      <parent link="${parent}" />
+      <child link="${prefix}_steer_link" />
+      <xacro:insert_block name="origin" />
+      <axis xyz="0 0 1" />
+      <dynamics damping="0.01" friction="0.0" />
+    </joint>
+
+    <!-- Rueda de tracción. La malla ya viene orientada con el eje de giro
+         en Y, por eso no lleva la rotación que sí necesita el cilindro. -->
+    <link name="${prefix}_wheel_link">
+      <xacro:if value="$(arg usar_mallas)">
+        <visual>
+          <geometry>
+            <mesh filename="${ruta_mallas}/${malla_rueda}" />
+          </geometry>
+          <material name="negro">
+            <color rgba="0.05 0.05 0.05 1.0" />
+          </material>
+        </visual>
+      </xacro:if>
+      <xacro:unless value="$(arg usar_mallas)">
+        <visual>
+          <origin xyz="0 0 0" rpy="1.5708 0 0" />
+          <geometry>
+            <cylinder radius="${radio_rueda}" length="${ancho_rueda}" />
+          </geometry>
+          <material name="negro">
+            <color rgba="0.05 0.05 0.05 1.0" />
+          </material>
+        </visual>
+      </xacro:unless>
+      <collision>
+        <origin xyz="0 0 0" rpy="1.5708 0 0" />
+        <geometry>
+          <cylinder radius="${radio_rueda}" length="${ancho_rueda}" />
+        </geometry>
+      </collision>
+      <!-- Cilindro macizo que gira sobre Y:
+           iyy = m r^2 / 2,  ixx = izz = m (3 r^2 + h^2) / 12 -->
+      <inertial>
+        <mass value="${masa_rueda}" />
+        <inertia ixx="${masa_rueda*(3*radio_rueda*radio_rueda + ancho_rueda*ancho_rueda)/12}" ixy="0" ixz="0"
+                 iyy="${masa_rueda*radio_rueda*radio_rueda/2}" iyz="0"
+                 izz="${masa_rueda*(3*radio_rueda*radio_rueda + ancho_rueda*ancho_rueda)/12}" />
+      </inertial>
+    </link>
+
+    <!-- Junta de tracción, a alto_modulo por debajo del pivote. El
+         amortiguamiento es un valor aproximado. -->
+    <joint name="${prefix}_wheel_joint" type="continuous">
+      <parent link="${prefix}_steer_link" />
+      <child link="${prefix}_wheel_link" />
+      <origin xyz="0 0 -${alto_modulo}" rpy="0 0 0" />
+      <axis xyz="0 1 0" />
+      <dynamics damping="0.001" friction="0.0" />
+    </joint>
+
+  </xacro:macro>
+</robot>

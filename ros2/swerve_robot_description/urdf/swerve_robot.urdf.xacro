@@ -1,0 +1,315 @@
+<?xml version="1.0"?>
+<!--
+  Modelo de la plataforma swerve de dos módulos.
+
+  Origen del robot (base_link): punto medio entre los ejes de dirección de
+  los dos módulos, el mismo origen usado en la formulación cinemática.
+  Ejes: X hacia adelante, Y hacia la izquierda, Z hacia arriba.
+
+  Argumentos:
+    balines_delanteros  true (por defecto) agrega la barra de 3 apoyos
+                        delanteros del prototipo; false la quita.
+    usar_mallas         true (por defecto) usa las mallas de meshes/ para
+                        la parte visual; false usa cajas y cilindros.
+    controllers_yaml    ruta del archivo de controladores (ver
+                        swerve_robot.gazebo.xacro).
+-->
+<robot name="swerve_robot" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:include filename="$(find swerve_robot_description)/urdf/modulo_swerve.xacro" />
+  <xacro:include filename="$(find swerve_robot_description)/urdf/swerve_robot.gazebo.xacro" />
+
+  <!-- Medidas del prototipo (en metros) -->
+  <xacro:property name="track_width" value="0.163" />          <!-- distancia entre ejes de dirección -->
+  <xacro:property name="wheelbase" value="0.131" />            <!-- distancia del origen a los apoyos traseros -->
+  <xacro:property name="separacion_balines" value="0.10" />    <!-- distancia entre apoyos traseros -->
+  <xacro:property name="radio_rueda" value="0.0275" />
+  <!-- Distancia vertical del pivote de dirección al eje de la rueda.
+       Se obtuvo de la altura mesa-engranaje de 56 dientes (10.8 cm) menos
+       el radio de la rueda. -->
+  <xacro:property name="alto_modulo" value="0.0805" />
+
+  <!-- Los apoyos delanteros solo existen en el prototipo, se agregaron para
+       que el chasis no se inclinara hacia adelante. No forman parte de la
+       plataforma final. -->
+  <xacro:arg name="balines_delanteros" default="true" />
+  <xacro:property name="balines_del_x" value="0.095" />        <!-- adelante del origen -->
+  <xacro:property name="balines_del_y" value="0.1045" />       <!-- track_width/2 + 0.023 -->
+
+  <!-- Las mallas solo reemplazan la parte visual. Colisiones, masas e
+       inercias siguen usando las formas simples de este archivo.
+       En el modelo de las mallas las ruedas quedaron a 15.35 cm entre sí
+       (16.3 cm en el prototipo). Como cada malla se ancló al centro de su
+       rueda, el pivote se ve unos 5 mm corrido respecto al chasis. La
+       diferencia es solo visual. -->
+  <xacro:arg name="usar_mallas" default="true" />
+  <xacro:property name="ruta_mallas" value="file://$(find swerve_robot_description)/meshes" />
+
+  <!-- Chasis. Las dimensiones son aproximadas y la masa corresponde solo a
+       la estructura, porque el bloque de control y los motores se modelan
+       aparte. -->
+  <xacro:property name="chasis_alto" value="0.015" />
+  <xacro:property name="chasis_largo" value="${wheelbase + 0.04}" />
+  <xacro:property name="chasis_ancho" value="${track_width + 0.02}" />
+  <xacro:property name="chasis_cabeza_largo" value="0.08" />   <!-- parte ancha delantera, cubre el largo del motor -->
+  <xacro:property name="chasis_columna_ancho" value="0.12" />  <!-- parte angosta trasera, llega hasta los apoyos -->
+  <xacro:property name="masa_chasis" value="0.12" />
+
+  <!-- Masas de los componentes según el catálogo del fabricante -->
+  <xacro:property name="masa_ev3" value="0.215" />             <!-- bloque de control -->
+  <xacro:property name="masa_motor" value="0.085" />           <!-- cada uno de los 4 motores -->
+
+  <!-- Apoyos pasivos: bola de acero de 18 mm dentro de una carcasa.
+       La masa se calculó para una esfera de acero maciza (sin la carcasa).
+       En el prototipo la bola rueda dentro de la carcasa, pero en el modelo
+       el apoyo está fijo y se desliza sobre el piso. Por eso se usa una
+       fricción casi nula, para que no frene al robot. -->
+  <xacro:property name="radio_balin" value="0.009" />
+  <xacro:property name="masa_balin" value="0.024" />
+  <xacro:property name="mu_balin" value="0.01" />
+
+  <!-- base_footprint es la raíz del árbol, sin masa y a nivel del piso.
+       KDL muestra una advertencia si el link raíz tiene inercia. base_link
+       se eleva lo justo para que las ruedas toquen el piso. -->
+  <link name="base_footprint" />
+
+  <joint name="base_footprint_joint" type="fixed">
+    <parent link="base_footprint" />
+    <child link="base_link" />
+    <origin xyz="0 0 ${radio_rueda + alto_modulo}" rpy="0 0 0" />
+  </joint>
+
+  <!-- Chasis en forma de T. Con mallas, chasis.dae incluye la estructura,
+       el bloque de control, los motores y los apoyos traseros. -->
+  <link name="base_link">
+    <xacro:if value="$(arg usar_mallas)">
+      <visual>
+        <geometry>
+          <mesh filename="${ruta_mallas}/chasis.dae" />
+        </geometry>
+        <material name="gris_claro_chasis">
+          <color rgba="0.85 0.85 0.85 1.0" />
+        </material>
+      </visual>
+      <xacro:if value="$(arg balines_delanteros)">
+        <visual>
+          <geometry>
+            <mesh filename="${ruta_mallas}/apoyos.dae" />
+          </geometry>
+          <material name="gris_balin">
+            <color rgba="0.4 0.4 0.4 1.0" />
+          </material>
+        </visual>
+      </xacro:if>
+    </xacro:if>
+
+    <!-- Parte ancha delantera -->
+    <xacro:unless value="$(arg usar_mallas)">
+      <visual>
+        <origin xyz="${0.02 - chasis_cabeza_largo/2} 0 0" rpy="0 0 0" />
+        <geometry>
+          <box size="${chasis_cabeza_largo} ${chasis_ancho} ${chasis_alto}" />
+        </geometry>
+        <material name="azul_chasis">
+          <color rgba="0.3 0.4 0.55 1.0" />
+        </material>
+      </visual>
+    </xacro:unless>
+    <collision>
+      <origin xyz="${0.02 - chasis_cabeza_largo/2} 0 0" rpy="0 0 0" />
+      <geometry>
+        <box size="${chasis_cabeza_largo} ${chasis_ancho} ${chasis_alto}" />
+      </geometry>
+    </collision>
+
+    <!-- Parte angosta trasera -->
+    <xacro:unless value="$(arg usar_mallas)">
+      <visual>
+        <origin xyz="${-wheelbase/2} 0 0" rpy="0 0 0" />
+        <geometry>
+          <box size="${chasis_largo} ${chasis_columna_ancho} ${chasis_alto}" />
+        </geometry>
+        <material name="azul_chasis">
+          <color rgba="0.3 0.4 0.55 1.0" />
+        </material>
+      </visual>
+    </xacro:unless>
+    <collision>
+      <origin xyz="${-wheelbase/2} 0 0" rpy="0 0 0" />
+      <geometry>
+        <box size="${chasis_largo} ${chasis_columna_ancho} ${chasis_alto}" />
+      </geometry>
+    </collision>
+
+    <!-- Inercia aproximada con el rectángulo que envuelve la T -->
+    <inertial>
+      <origin xyz="${-wheelbase/2} 0 0" rpy="0 0 0" />
+      <mass value="${masa_chasis}" />
+      <inertia
+        ixx="${masa_chasis/12.0 * (chasis_ancho*chasis_ancho + chasis_alto*chasis_alto)}"
+        iyy="${masa_chasis/12.0 * (chasis_largo*chasis_largo + chasis_alto*chasis_alto)}"
+        izz="${masa_chasis/12.0 * (chasis_largo*chasis_largo + chasis_ancho*chasis_ancho)}"
+        ixy="0" ixz="0" iyz="0" />
+    </inertial>
+  </link>
+
+  <!-- Bloque de control, apoyado sobre el chasis. Dimensiones y posición
+       aproximadas. -->
+  <link name="ev3_link">
+    <xacro:unless value="$(arg usar_mallas)">
+      <visual>
+        <geometry>
+          <box size="0.15 0.08 0.04" />
+        </geometry>
+        <material name="blanco_ev3">
+          <color rgba="0.92 0.92 0.85 1.0" />
+        </material>
+      </visual>
+    </xacro:unless>
+    <collision>
+      <geometry>
+        <box size="0.15 0.08 0.04" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="${masa_ev3}" />
+      <inertia
+        ixx="${masa_ev3/12.0 * (0.08*0.08 + 0.04*0.04)}"
+        iyy="${masa_ev3/12.0 * (0.15*0.15 + 0.04*0.04)}"
+        izz="${masa_ev3/12.0 * (0.15*0.15 + 0.08*0.08)}"
+        ixy="0" ixz="0" iyz="0" />
+    </inertial>
+  </link>
+
+  <joint name="ev3_joint" type="fixed">
+    <parent link="base_link" />
+    <child link="ev3_link" />
+    <origin xyz="${-wheelbase/2} 0 ${chasis_alto/2 + 0.02}" rpy="0 0 0" />
+  </joint>
+
+  <!-- Motores. Los cuatro (dirección y tracción de cada módulo) van fijos
+       al chasis y no giran con el módulo, por eso se modelan aquí y no en
+       modulo_swerve.xacro. Cada par queda alineado con el eje de su módulo,
+       con el de tracción encima del de dirección. Tamaño y posición
+       aproximados. -->
+  <xacro:property name="motor_largo" value="0.08" />
+  <xacro:property name="motor_ancho" value="0.025" />
+  <xacro:property name="motor_alto" value="0.0125" />
+  <xacro:property name="motor_x_offset" value="-0.02" />       <!-- hacia el centro del chasis -->
+
+  <xacro:macro name="motor_fijo" params="prefix xyz">
+    <link name="${prefix}_link">
+      <xacro:unless value="$(arg usar_mallas)">
+        <visual>
+          <geometry>
+            <box size="${motor_largo} ${motor_ancho} ${motor_alto}" />
+          </geometry>
+          <material name="azul_blanco_motor">
+            <color rgba="0.5 0.55 0.6 1.0" />
+          </material>
+        </visual>
+      </xacro:unless>
+      <collision>
+        <geometry>
+          <box size="${motor_largo} ${motor_ancho} ${motor_alto}" />
+        </geometry>
+      </collision>
+      <inertial>
+        <mass value="${masa_motor}" />
+        <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001" />
+      </inertial>
+    </link>
+    <joint name="${prefix}_joint" type="fixed">
+      <parent link="base_link" />
+      <child link="${prefix}_link" />
+      <origin xyz="${xyz}" rpy="0 0 0" />
+    </joint>
+  </xacro:macro>
+
+  <xacro:motor_fijo prefix="der_motor_direccion" xyz="${motor_x_offset} ${-track_width/2} ${chasis_alto/2+motor_alto/2}" />
+  <xacro:motor_fijo prefix="izq_motor_direccion" xyz="${motor_x_offset} ${track_width/2}  ${chasis_alto/2+motor_alto/2}" />
+  <xacro:motor_fijo prefix="der_motor_traccion"  xyz="${motor_x_offset} ${-track_width/2} ${chasis_alto/2+motor_alto/2+motor_alto}" />
+  <xacro:motor_fijo prefix="izq_motor_traccion"  xyz="${motor_x_offset} ${track_width/2}  ${chasis_alto/2+motor_alto/2+motor_alto}" />
+
+  <!-- Módulos swerve, uno a cada lado del origen -->
+  <xacro:modulo_swerve prefix="der" reflect="1" parent="base_link" radio_rueda="${radio_rueda}" alto_modulo="${alto_modulo}"
+                       malla_pivote="pivote_derecho.dae" malla_rueda="rueda_derecha.dae">
+    <origin xyz="0 ${-track_width/2} 0" rpy="0 0 0" />
+  </xacro:modulo_swerve>
+
+  <xacro:modulo_swerve prefix="izq" reflect="-1" parent="base_link" radio_rueda="${radio_rueda}" alto_modulo="${alto_modulo}"
+                       malla_pivote="pivote_izquierdo.dae" malla_rueda="rueda_izquierda.dae">
+    <origin xyz="0 ${track_width/2} 0" rpy="0 0 0" />
+  </xacro:modulo_swerve>
+
+  <!-- Apoyo pasivo: esfera en contacto con el piso y una pata que la une
+       con la cara inferior del chasis. No participa en la cinemática, solo
+       sostiene el chasis. -->
+  <xacro:macro name="balin_pasivo" params="prefix xyz">
+    <xacro:property name="pata_radio" value="0.006" />
+    <xacro:property name="pata_largo" value="${radio_rueda + alto_modulo - chasis_alto/2 - 2*radio_balin}" />
+
+    <link name="${prefix}_balin_link">
+      <xacro:unless value="$(arg usar_mallas)">
+        <visual>
+          <geometry>
+            <sphere radius="${radio_balin}" />
+          </geometry>
+          <material name="gris_balin">
+            <color rgba="0.4 0.4 0.4 1.0" />
+          </material>
+        </visual>
+      </xacro:unless>
+      <collision>
+        <geometry>
+          <sphere radius="${radio_balin}" />
+        </geometry>
+      </collision>
+      <xacro:unless value="$(arg usar_mallas)">
+        <visual>
+          <origin xyz="0 0 ${radio_balin + pata_largo/2}" rpy="0 0 0" />
+          <geometry>
+            <cylinder radius="${pata_radio}" length="${pata_largo}" />
+          </geometry>
+          <material name="gris_balin">
+            <color rgba="0.4 0.4 0.4 1.0" />
+          </material>
+        </visual>
+      </xacro:unless>
+      <collision>
+        <origin xyz="0 0 ${radio_balin + pata_largo/2}" rpy="0 0 0" />
+        <geometry>
+          <cylinder radius="${pata_radio}" length="${pata_largo}" />
+        </geometry>
+      </collision>
+      <!-- Esfera maciza: I = 2/5 m r^2 -->
+      <inertial>
+        <mass value="${masa_balin}" />
+        <inertia ixx="${0.4*masa_balin*radio_balin*radio_balin}" ixy="0" ixz="0"
+                 iyy="${0.4*masa_balin*radio_balin*radio_balin}" iyz="0"
+                 izz="${0.4*masa_balin*radio_balin*radio_balin}" />
+      </inertial>
+    </link>
+    <gazebo reference="${prefix}_balin_link">
+      <mu1>${mu_balin}</mu1>
+      <mu2>${mu_balin}</mu2>
+    </gazebo>
+    <joint name="${prefix}_balin_joint" type="fixed">
+      <parent link="base_link" />
+      <child link="${prefix}_balin_link" />
+      <origin xyz="${xyz}" rpy="0 0 0" />
+    </joint>
+  </xacro:macro>
+
+  <!-- Apoyos traseros -->
+  <xacro:balin_pasivo prefix="balin_der" xyz="${-wheelbase} ${-separacion_balines/2} ${-(radio_rueda+alto_modulo)+radio_balin}" />
+  <xacro:balin_pasivo prefix="balin_izq" xyz="${-wheelbase} ${separacion_balines/2} ${-(radio_rueda+alto_modulo)+radio_balin}" />
+
+  <!-- Apoyos delanteros (opcionales) -->
+  <xacro:if value="$(arg balines_delanteros)">
+    <xacro:balin_pasivo prefix="balin_del_der" xyz="${balines_del_x} ${-balines_del_y} ${-(radio_rueda+alto_modulo)+radio_balin}" />
+    <xacro:balin_pasivo prefix="balin_del_centro" xyz="${balines_del_x} 0 ${-(radio_rueda+alto_modulo)+radio_balin}" />
+    <xacro:balin_pasivo prefix="balin_del_izq" xyz="${balines_del_x} ${balines_del_y} ${-(radio_rueda+alto_modulo)+radio_balin}" />
+  </xacro:if>
+
+</robot>

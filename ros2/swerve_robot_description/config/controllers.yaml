@@ -1,0 +1,31 @@
+# Controladores de ros2_control para el modelo en Gazebo.
+# El orden de las juntas (derecha, izquierda) es el mismo que usan los nodos
+# de swerve_control al publicar los comandos.
+
+controller_manager:
+  ros__parameters:
+    update_rate: 50  # Hz
+
+    # Publica la posición y velocidad de las juntas en /joint_states
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    steer_position_controller:
+      type: position_controllers/JointGroupPositionController
+
+    wheel_velocity_controller:
+      type: velocity_controllers/JointGroupVelocityController
+
+# Dirección: recibe el ángulo de cada módulo en rad.
+steer_position_controller:
+  ros__parameters:
+    joints:
+      - der_steer_joint
+      - izq_steer_joint
+
+# Tracción: recibe la velocidad angular de cada rueda en rad/s.
+wheel_velocity_controller:
+  ros__parameters:
+    joints:
+      - der_wheel_joint
+      - izq_wheel_joint

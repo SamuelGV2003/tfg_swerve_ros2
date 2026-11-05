@@ -1,0 +1,70 @@
+<?xml version="1.0"?>
+<!--
+  Interfaz entre el modelo y ros2_control para Gazebo Sim (Harmonic).
+
+  Se usa gz_ros2_control, que es el plugin para Gazebo Sim.
+
+  Juntas controladas:
+    der_steer_joint, izq_steer_joint   se comandan en posición (ángulo del módulo)
+    der_wheel_joint, izq_wheel_joint   se comandan en velocidad (velocidad de la rueda)
+  Las juntas de los apoyos son fijas y no se controlan.
+
+  Argumento:
+    controllers_yaml   ruta del archivo de controladores. La entrega gazebo.launch.py, que copia controllers.yaml a /tmp
+                       
+-->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <ros2_control name="swerve_hardware" type="system">
+    <hardware>
+      <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+    </hardware>
+
+    <joint name="der_steer_joint">
+      <command_interface name="position">
+        <param name="initial_value">0.0</param>
+      </command_interface>
+      <state_interface name="position" />
+      <state_interface name="velocity" />
+    </joint>
+
+    <joint name="izq_steer_joint">
+      <command_interface name="position">
+        <param name="initial_value">0.0</param>
+      </command_interface>
+      <state_interface name="position" />
+      <state_interface name="velocity" />
+    </joint>
+
+    <joint name="der_wheel_joint">
+      <command_interface name="velocity">
+        <param name="initial_value">0.0</param>
+      </command_interface>
+      <state_interface name="position" />
+      <state_interface name="velocity" />
+    </joint>
+
+    <joint name="izq_wheel_joint">
+      <command_interface name="velocity">
+        <param name="initial_value">0.0</param>
+      </command_interface>
+      <state_interface name="position" />
+      <state_interface name="velocity" />
+    </joint>
+  </ros2_control>
+
+  <xacro:arg name="controllers_yaml" default="" />
+
+  <!-- Plugin que hace que Gazebo funcione como el hardware del robot.
+       Lee las juntas declaradas arriba y carga los controladores del
+       archivo controllers_yaml. -->
+  <gazebo>
+    <plugin filename="libgz_ros2_control-system.so"
+            name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+      <robot_param>robot_description</robot_param>
+      <robot_param_node>robot_state_publisher</robot_param_node>
+      <parameters>$(arg controllers_yaml)</parameters>
+    </plugin>
+  </gazebo>
+
+</robot>
